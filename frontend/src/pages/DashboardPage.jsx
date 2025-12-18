@@ -55,6 +55,7 @@ export default function DashboardPage() {
     })
     const [loading, setLoading] = useState(true)
     const [loadingForecast, setLoadingForecast] = useState(false)
+    const [loadingRisk, setLoadingRisk] = useState(false)
     const [selectedMetric, setSelectedMetric] = useState(null)
     const [ganttFilter, setGanttFilter] = useState("all")
 
@@ -95,12 +96,6 @@ export default function DashboardPage() {
                     } catch (err) { console.warn("Skipping malformed project data", p); }
                 });
 
-                const finalRisk = Object.keys(regionMap).map(r => ({
-                    region: r,
-                    factor: "Composite",
-                    score: Math.round(regionMap[r].scoreSum / regionMap[r].count)
-                }));
-
                 // Notifications Logic
                 const recencyLimitDays = 7;
                 const lastCleared = localStorage.getItem('notificationLastCleared');
@@ -135,7 +130,7 @@ export default function DashboardPage() {
                     totalResources: resources,
                     highRiskCount: riskCount,
                     forecastData: [], // Will be filled by AI
-                    riskData: finalRisk,
+                    riskData: [],     // Will be filled by AI
                     ganttTasks: [],
                     allProjects: projects,
                     notifications: activeNotifications
@@ -143,9 +138,10 @@ export default function DashboardPage() {
 
                 setLoading(false);
 
-                // 2. Fetch Aggregated AI Forecast
+                // 2. Fetch Aggregated AI Insights
                 if (projects.length > 0) {
                     fetchAIForecast(projects);
+                    fetchAIRisk(projects);
                 }
 
             } catch (error) {
@@ -196,6 +192,50 @@ export default function DashboardPage() {
             Predicted: aggregatedForecast[month].forecast
         }));
         setStats(prev => ({ ...prev, forecastData: finalForecast }));
+    }
+
+    const fetchAIRisk = async (projects) => {
+        setLoadingRisk(true);
+        try {
+            const res = await api.post("/predict/ai", {
+                type: "dashboard_risk_assessment",
+                projects: projects.map(p => ({
+                    name: p.name,
+                    region: p.region,
+                    type: p.type,
+                    riskLevel: p.riskLevel
+                }))
+            });
+
+            if (res && res.riskData) {
+                setStats(prev => ({ ...prev, riskData: res.riskData }));
+            }
+        } catch (error) {
+            console.error("AI Risk Assessment Failed", error);
+            fallbackLocalRisk(projects);
+        } finally {
+            setLoadingRisk(false);
+        }
+    }
+
+    const fallbackLocalRisk = (projects) => {
+        const regionMap = {};
+        projects.forEach(p => {
+            const region = p.region || p.type || "General";
+            if (!regionMap[region]) regionMap[region] = { count: 0, scoreSum: 0 };
+            let score = p.riskLevel === 'Critical' ? 95 : p.riskLevel === 'High' ? 85 : p.riskLevel === 'Medium' ? 55 : 20;
+            regionMap[region].count++;
+            regionMap[region].scoreSum += score;
+        });
+        const finalRisk = Object.keys(regionMap).map(r => {
+            const avg = Math.round(regionMap[r].scoreSum / regionMap[r].count);
+            return {
+                region: r,
+                factor: avg > 60 ? "Timeline Criticality" : "Operational Efficiency",
+                score: avg
+            };
+        });
+        setStats(prev => ({ ...prev, riskData: finalRisk }));
     }
 
     const getFilteredProjects = () => {

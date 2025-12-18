@@ -114,7 +114,26 @@ export const getAIAnalytics = async (req, res) => {
                     "insight": "Brief aggregated financial insight."
                 }
             `;
+        } else if (type === "dashboard_risk_assessment") {
+            const projects = req.body.projects || [];
+            const summary = projects.map(p => `${p.region || p.type || "General"}: ${p.name} (${p.riskLevel})`).join(", ");
+
+            prompt = `
+                You are a Risk Analyst. Analyze these projects grouped by Region/Category: ${summary.substring(0, 1000)}...
+                
+                Identify the primary risk factor for each region (e.g., "Resource Shortage", "Timeline Compression", "Budget Constraints").
+                Calculate an aggregate risk score (0-100) for each region.
+                
+                Return ONLY valid JSON in this format:
+                {
+                    "riskData": [
+                         {"region": "North America", "factor": "Resource Shortage", "score": 75},
+                         {"region": "Europe", "factor": "Regulatory Compliance", "score": 40}
+                    ]
+                }
+            `;
         }
+
 
         if (!prompt) {
             return res.status(400).json({ message: "Invalid prediction type" });
@@ -263,7 +282,6 @@ const generateFallbackData = (type, projectData) => {
         };
     } else if (type === "dashboard_cost_forecast") {
         const data = [];
-        // Handle projectData as either { projects: [...] } or just [...]
         let projects = [];
         if (projectData && Array.isArray(projectData.projects)) {
             projects = projectData.projects;
@@ -281,7 +299,6 @@ const generateFallbackData = (type, projectData) => {
         const monthlyBase = totalBudget / 6;
 
         for (let i = 1; i <= 6; i++) {
-            // Simulate variance: Actual might be 0.8x to 1.2x of Predicted
             const variance = 0.8 + (Math.random() * 0.4);
             data.push({
                 name: `Month ${i}`,
@@ -293,31 +310,38 @@ const generateFallbackData = (type, projectData) => {
             forecastData: data,
             insight: "Portfolio spending is projected based on current budgets (Backend Fallback)."
         };
-    } else if (type === "dashboard_cost_forecast") {
-        // Aggregate fallback for dashboard
-        const data = [];
-        // Approximate total budget from "projects" if passed, or mock it?
-        // generateFallbackData signature assumes `projectData` is the second arg. 
-        // For dashboard, we might have passed `req.body` as projectData or we need to check if projectData is array?
-        // In the controller call: `generateFallbackData(type, projectData)`
-        // In the dashboard case, `projectData` might be undefined or we used `req.body.projects`.
-        // Let's assume we pass `req.body.projects` as projectData for this type locally?
-        // But `generateWithRetry` catch passes `type` and `projectData`.
-        // We need to make sure we treat it right. 
+    } else if (type === "dashboard_risk_assessment") {
+        const projects = (projectData && Array.isArray(projectData.projects)) ? projectData.projects : (Array.isArray(projectData) ? projectData : []);
+        const regionMap = {};
 
-        // Simple mock since we don't assume full project access in fallback context easily without refactor
-        const base = 50000;
-        for (let i = 1; i <= 6; i++) {
-            data.push({
-                name: `Month ${i}`,
-                Actual: base * (0.8 + Math.random() * 0.4),
-                Predicted: base
-            });
+        projects.forEach(p => {
+            const region = p.region || p.type || "General";
+            if (!regionMap[region]) regionMap[region] = { count: 0, scoreSum: 0 };
+
+            let score = 20; // Low
+            if (p.riskLevel === 'Medium') score = 55;
+            if (p.riskLevel === 'High') score = 85;
+            if (p.riskLevel === 'Critical') score = 95;
+
+            regionMap[region].count++;
+            regionMap[region].scoreSum += score;
+        });
+
+        const riskData = Object.keys(regionMap).map(r => {
+            const avg = Math.round(regionMap[r].scoreSum / regionMap[r].count);
+            const factor = avg > 70 ? "Timeline Criticality" : (avg > 40 ? "Resource Allocation" : "Operational Efficiency");
+            return { region: r, factor, score: avg };
+        });
+
+        if (riskData.length === 0) {
+            return {
+                riskData: [
+                    { region: "General", factor: "System Stability", score: 25 }
+                ]
+            };
         }
-        return {
-            forecastData: data,
-            insight: "Portfolio spending is within limits (Backend Fallback)."
-        };
+
+        return { riskData };
     }
     return { message: "No data available" };
 };
