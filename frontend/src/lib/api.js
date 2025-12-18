@@ -1,4 +1,4 @@
-const BASE_URL = "https://schedra-predict-plan-deliver-server.vercel.app/" || "http://localhost:5000/api";
+const BASE_URL = "https://schedra-predict-plan-deliver-server.vercel.app/api" || "http://localhost:5000/api";
 
 export const api = {
     get: async (endpoint) => {
