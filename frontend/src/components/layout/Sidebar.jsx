@@ -35,8 +35,11 @@ const sidebarNavItems = [
     },
 ]
 
+import { useState } from "react"
+
 export function Sidebar({ className }) {
     const location = useLocation()
+    const [open, setOpen] = useState(false)
 
     return (
         <TooltipProvider>
@@ -70,7 +73,7 @@ export function Sidebar({ className }) {
 
             {/* Mobile Sidebar */}
             <div className="md:hidden p-4 border-b flex items-center gap-4">
-                <Sheet>
+                <Sheet open={open} onOpenChange={setOpen}>
                     <SheetTrigger asChild>
                         <Button variant="outline" size="icon">
                             <Menu className="h-4 w-4" />
@@ -89,6 +92,7 @@ export function Sidebar({ className }) {
                                     <Link
                                         key={item.href}
                                         to={item.href}
+                                        onClick={() => setOpen(false)}
                                     >
                                         <Button
                                             variant={location.pathname === item.href ? "secondary" : "ghost"}

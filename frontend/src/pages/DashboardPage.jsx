@@ -386,7 +386,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Top Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Card
                     className="cursor-pointer hover:bg-accent/5 transition-colors"
                     onClick={() => setSelectedMetric('budget')}
@@ -445,29 +445,35 @@ export default function DashboardPage() {
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 md:grid-cols-7 gap-6">
-                <CostOverviewChart data={stats.forecastData} loading={loadingForecast} />
-                <RiskHeatmap data={stats.riskData} loading={loadingRisk} />
+                <div className="col-span-1 md:col-span-4">
+                    <CostOverviewChart data={stats.forecastData} loading={loadingForecast} />
+                </div>
+                <div className="col-span-1 md:col-span-3">
+                    <RiskHeatmap data={stats.riskData} loading={loadingRisk} />
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-7 gap-6">
-                <ProjectGantt
-                    tasks={getFilteredGanttTasks()}
-                    headerAction={
-                        <Select value={ganttFilter} onValueChange={setGanttFilter}>
-                            <SelectTrigger className="w-[200px] h-8">
-                                <SelectValue placeholder="Filter Timeline" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Projects</SelectItem>
-                                {stats.allProjects.map(p => (
-                                    <SelectItem key={p._id || p.id} value={p._id || p.id}>
-                                        {p.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    }
-                />
+                <div className="col-span-full">
+                    <ProjectGantt
+                        tasks={getFilteredGanttTasks()}
+                        headerAction={
+                            <Select value={ganttFilter} onValueChange={setGanttFilter}>
+                                <SelectTrigger className="w-full sm:w-[200px] h-8">
+                                    <SelectValue placeholder="Filter Timeline" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Projects</SelectItem>
+                                    {stats.allProjects.map(p => (
+                                        <SelectItem key={p._id || p.id} value={p._id || p.id}>
+                                            {p.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        }
+                    />
+                </div>
             </div>
 
             <Dialog open={!!selectedMetric} onOpenChange={(open) => !open && setSelectedMetric(null)}>

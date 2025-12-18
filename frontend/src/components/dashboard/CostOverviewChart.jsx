@@ -14,7 +14,7 @@ const defaultData = [
 export function CostOverviewChart({ data, loading }) {
     const chartData = data || defaultData;
     return (
-        <Card className="col-span-4">
+        <Card className="w-full h-full">
             <CardHeader>
                 <CardTitle>Cost vs Forecast</CardTitle>
                 <CardDescription>

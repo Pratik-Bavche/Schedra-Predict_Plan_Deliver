@@ -178,7 +178,7 @@ export default function ProjectsPage() {
                             <div className="grid gap-6 py-4">
 
                                 {/* Common Header Fields */}
-                                <div className="grid grid-cols-2 gap-4 border-b pb-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-4">
                                     <div className="grid gap-2">
                                         <Label htmlFor="name">Project Name</Label>
                                         <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Project Title" />
@@ -195,7 +195,7 @@ export default function ProjectsPage() {
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="grid gap-2 col-span-2">
+                                    <div className="grid gap-2 md:col-span-2">
                                         <Label htmlFor="desc">Description</Label>
                                         <Input id="desc" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Brief overview of goals and scope" />
                                     </div>
@@ -212,7 +212,7 @@ export default function ProjectsPage() {
                                 </div>
 
                                 {/* Common Details */}
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="grid gap-2">
                                         <Label htmlFor="start">Start Date</Label>
                                         <Input id="start" type="date" value={formData.startDate} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })} />
@@ -241,8 +241,8 @@ export default function ProjectsPage() {
                                     </h3>
 
                                     {formData.type === "IT" && (
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="grid gap-2 col-span-2">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="grid gap-2 md:col-span-2">
                                                 <Label>Technology Stack</Label>
                                                 <Input value={formData.techStack} onChange={(e) => setFormData({ ...formData, techStack: e.target.value })} placeholder="e.g. React, Node.js, AWS" />
                                             </div>
@@ -289,11 +289,11 @@ export default function ProjectsPage() {
                                                 <Label>Expected Users / Load</Label>
                                                 <Input value={formData.expectedLoad} onChange={(e) => setFormData({ ...formData, expectedLoad: e.target.value })} placeholder="e.g. 10k users" />
                                             </div>
-                                            <div className="grid gap-2 col-span-2">
+                                            <div className="grid gap-2 md:col-span-2">
                                                 <Label>Modules / Features</Label>
                                                 <Input value={formData.modules} onChange={(e) => setFormData({ ...formData, modules: e.target.value })} placeholder="Key deliverables" />
                                             </div>
-                                            <div className="grid gap-2 col-span-2">
+                                            <div className="grid gap-2 md:col-span-2">
                                                 <Label>Integration Requirements</Label>
                                                 <Input value={formData.integrationReq} onChange={(e) => setFormData({ ...formData, integrationReq: e.target.value })} placeholder="APIs, 3rd party" />
                                             </div>
@@ -407,7 +407,7 @@ export default function ProjectsPage() {
                                 </div>
 
                                 {/* Docs */}
-                                <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
                                     <div className="grid gap-2">
                                         <Label>Schedule File/URL</Label>
                                         <Input value={formData.scheduleUrl} onChange={(e) => setFormData({ ...formData, scheduleUrl: e.target.value })} placeholder="Link to Gantt/Excel" />
@@ -436,82 +436,84 @@ export default function ProjectsPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-[100px]">ID</TableHead>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Manager</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Risk</TableHead>
-                                <TableHead className="text-right">Budget</TableHead>
-                                <TableHead className="w-[50px]"></TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {projects.length === 0 ? (
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={8} className="text-center h-24 text-muted-foreground">
-                                        No projects found. Create one to get started.
-                                    </TableCell>
+                                    <TableHead className="w-[100px]">ID</TableHead>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead>Manager</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Risk</TableHead>
+                                    <TableHead className="text-right">Budget</TableHead>
+                                    <TableHead className="w-[50px]"></TableHead>
                                 </TableRow>
-                            ) : (
-                                projects.map((project) => (
-                                    <TableRow key={project.id}>
-                                        <TableCell className="font-medium">{project.id}</TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-col">
-                                                <span className="font-medium">{project.name}</span>
-                                                <span className="text-xs text-muted-foreground">{new Date(project.dueDate).toLocaleDateString()}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell><Badge variant="outline">{project.type}</Badge></TableCell>
-                                        <TableCell>{project.manager || "-"}</TableCell>
-                                        <TableCell>
-                                            <Badge variant={project.status === "Completed" ? "default" : project.status === "Delayed" ? "destructive" : "secondary"}>
-                                                {project.status}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className={cn(
-                                                "font-medium",
-                                                project.risk === "Critical" ? "text-destructive" : project.risk === "High" ? "text-orange-600" : "text-green-600"
-                                            )}>
-                                                {project.risk}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell className="text-right">${project.budget?.toLocaleString()}</TableCell>
-                                        <TableCell>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-8 w-8 p-0">
-                                                        <span className="sr-only">Open menu</span>
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                    <DropdownMenuItem onClick={() => navigate(`/projects/${project._id}`)}>
-                                                        View Details
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleOpenEdit(project)}>
-                                                        Edit Details
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        className="text-destructive focus:text-destructive"
-                                                        onClick={() => handleDelete(project)}
-                                                    >
-                                                        Delete
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                            </TableHeader>
+                            <TableBody>
+                                {projects.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={8} className="text-center h-24 text-muted-foreground">
+                                            No projects found. Create one to get started.
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
+                                ) : (
+                                    projects.map((project) => (
+                                        <TableRow key={project.id}>
+                                            <TableCell className="font-medium">{project.id}</TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col">
+                                                    <span className="font-medium">{project.name}</span>
+                                                    <span className="text-xs text-muted-foreground">{new Date(project.dueDate).toLocaleDateString()}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell><Badge variant="outline">{project.type}</Badge></TableCell>
+                                            <TableCell>{project.manager || "-"}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={project.status === "Completed" ? "default" : project.status === "Delayed" ? "destructive" : "secondary"}>
+                                                    {project.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className={cn(
+                                                    "font-medium",
+                                                    project.risk === "Critical" ? "text-destructive" : project.risk === "High" ? "text-orange-600" : "text-green-600"
+                                                )}>
+                                                    {project.risk}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="text-right">${project.budget?.toLocaleString()}</TableCell>
+                                            <TableCell>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                                            <span className="sr-only">Open menu</span>
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                        <DropdownMenuItem onClick={() => navigate(`/projects/${project._id}`)}>
+                                                            View Details
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleOpenEdit(project)}>
+                                                            Edit Details
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            className="text-destructive focus:text-destructive"
+                                                            onClick={() => handleDelete(project)}
+                                                        >
+                                                            Delete
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
         </div >

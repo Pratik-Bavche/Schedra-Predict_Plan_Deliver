@@ -17,6 +17,9 @@ export default function ForecastsPage() {
     const handleSimulation = async () => {
         setLoading(true)
         try {
+            // Artificial delay for better UX
+            await new Promise(resolve => setTimeout(resolve, 2000))
+
             // Mapping UI sliders to ML model inputs
             // Weather -> Complexity
             // Material -> Inflation
