@@ -1,12 +1,14 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
-import { Users, Settings, Briefcase, Bell, Link, Monitor, Shield, FilePlus } from "lucide-react"
+import { useAuth } from "@/context/AuthContext"
+import { Users, Settings, Briefcase, Bell, Link, Monitor, Shield, FilePlus, LogOut, User } from "lucide-react"
 
 import {
     Dialog,
@@ -20,6 +22,7 @@ import {
 import { toast } from "sonner"
 
 export default function SettingsPage() {
+    const { user, logout } = useAuth()
     const [activeTab, setActiveTab] = useState("user-management")
     const [isAddUserOpen, setIsAddUserOpen] = useState(false)
     const [users, setUsers] = useState([
@@ -61,6 +64,11 @@ export default function SettingsPage() {
         { id: "custom-fields", label: "Custom Field Builder", icon: FilePlus },
     ]
 
+    const handleLogout = () => {
+        logout()
+        toast.success("Logged out successfully")
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -71,7 +79,31 @@ export default function SettingsPage() {
             </div>
 
             <div className="flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0">
-                <aside className="-mx-4 lg:w-1/5">
+                <aside className="-mx-4 lg:w-1/5 space-y-6">
+                    {/* User Profile Summary */}
+                    <div className="px-4 py-4 border rounded-lg bg-muted/50">
+                        <div className="flex items-center space-x-3 mb-3">
+                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
+                                {user?.name?.charAt(0) || "U"}
+                            </div>
+                            <div className="overflow-hidden">
+                                <p className="text-sm font-medium truncate">{user?.name || "Guest User"}</p>
+                                <p className="text-xs text-muted-foreground truncate">{user?.email || "No Email"}</p>
+                            </div>
+                        </div>
+                        <Badge variant="outline" className="w-full justify-center mb-3">
+                            {user?.role || "Viewer"}
+                        </Badge>
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            className="w-full"
+                            onClick={handleLogout}
+                        >
+                            <LogOut className="mr-2 h-4 w-4" /> Log Out
+                        </Button>
+                    </div>
+
                     <nav className="flex flex-col space-y-1">
                         {menuItems.map((item) => (
                             <Button
