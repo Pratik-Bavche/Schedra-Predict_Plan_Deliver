@@ -1,4 +1,4 @@
-const BASE_URL = "https://schedra-predict-plan-deliver-server.vercel.app";
+const BASE_URL = "https://schedra-predict-plan-deliver-server.vercel.app/api";
 
 
 export const api = {
