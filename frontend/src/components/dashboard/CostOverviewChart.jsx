@@ -29,7 +29,7 @@ export function CostOverviewChart({ data, loading }) {
                             <p className="text-sm">Generating AI Forecast...</p>
                         </div>
                     ) : (
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="99%" height="100%">
                             <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                 <XAxis

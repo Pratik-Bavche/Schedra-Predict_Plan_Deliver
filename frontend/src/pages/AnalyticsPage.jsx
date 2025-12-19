@@ -322,7 +322,7 @@ export default function AnalyticsPage() {
                                 <CardDescription>AI Forecasted Final Cost: ${costData.finalCost.toLocaleString()}</CardDescription>
                             </CardHeader>
                             <CardContent className="h-[350px] w-full min-h-[350px]">
-                                <ResponsiveContainer width="100%" height="100%">
+                                <ResponsiveContainer width="99%" height="100%">
                                     <ComposedChart data={costData.forecastData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" />
