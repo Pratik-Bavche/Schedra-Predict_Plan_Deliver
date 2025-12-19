@@ -22,7 +22,7 @@ export function CostOverviewChart({ data, loading }) {
                 </CardDescription>
             </CardHeader>
             <CardContent className="pl-0 pb-2">
-                <div className="h-[350px] w-full flex items-center justify-center">
+                <div className="h-[350px] w-full flex items-center justify-center min-h-[350px]">
                     {loading ? (
                         <div className="flex flex-col items-center gap-2 text-muted-foreground">
                             <Loader2 className="h-8 w-8 animate-spin text-primary" />

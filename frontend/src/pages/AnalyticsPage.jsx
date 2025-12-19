@@ -321,7 +321,7 @@ export default function AnalyticsPage() {
                                 <CardTitle>Cost Analytics (Est. vs Actual)</CardTitle>
                                 <CardDescription>AI Forecasted Final Cost: ${costData.finalCost.toLocaleString()}</CardDescription>
                             </CardHeader>
-                            <CardContent className="h-[350px] w-full">
+                            <CardContent className="h-[350px] w-full min-h-[350px]">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <ComposedChart data={costData.forecastData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" />
@@ -409,7 +409,7 @@ export default function AnalyticsPage() {
                                             {/* Progress Circle */}
                                             <circle
                                                 className={`transition-all duration-1000 ease-out ${riskData.riskScore > 75 ? "text-red-500" :
-                                                        riskData.riskScore > 50 ? "text-orange-500" : "text-green-500"
+                                                    riskData.riskScore > 50 ? "text-orange-500" : "text-green-500"
                                                     } stroke-current`}
                                                 strokeWidth="12"
                                                 strokeLinecap="round"
