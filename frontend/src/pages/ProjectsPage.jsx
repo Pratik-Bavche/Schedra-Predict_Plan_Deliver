@@ -82,8 +82,20 @@ export default function ProjectsPage() {
 
     const handleOpenCreate = () => {
         setEditMode(false)
+
+        // Load Defaults
+        const savedDefaults = localStorage.getItem("projectDefaults");
+        let defaultType = "IT";
+        if (savedDefaults) {
+            const parsed = JSON.parse(savedDefaults);
+            if (parsed.category === "construction" || parsed.category === "infra") defaultType = "Infrastructure";
+            else if (parsed.category === "startup") defaultType = "Startup";
+            else if (parsed.category === "it") defaultType = "IT";
+            else defaultType = "Other";
+        }
+
         setFormData({
-            name: "", projectId: "", type: "IT", description: "",
+            name: "", projectId: "", type: defaultType, description: "",
             startDate: "", endDate: "", budget: "", manager: "", client: "", riskLevel: "Low",
             techStack: "", teamSize: "", modules: "", repoLink: "", methodology: "Agile", expectedLoad: "", integrationReq: "",
             subType: "", region: "", capacity: "", terrain: "Plain", contractor: "", landStatus: "Pending", envStatus: "Not Started", equipment: "", permits: "",

@@ -28,6 +28,17 @@ export default function SettingsPage() {
     ])
     const [newUser, setNewUser] = useState({ name: "", email: "", role: "viewer" })
 
+    // Project Defaults State
+    const [projectDefaults, setProjectDefaults] = useState(() => {
+        const saved = localStorage.getItem("projectDefaults");
+        return saved ? JSON.parse(saved) : { category: "it", currency: "usd", buffer: 10 };
+    });
+
+    const handleSaveDefaults = () => {
+        localStorage.setItem("projectDefaults", JSON.stringify(projectDefaults));
+        toast.success("Project defaults saved successfully");
+    };
+
     const handleAddUser = () => {
         if (!newUser.name || !newUser.email) {
             toast.error("Please fill in all fields")
@@ -179,7 +190,10 @@ export default function SettingsPage() {
                                 <CardContent className="space-y-4">
                                     <div className="grid gap-2">
                                         <Label>Default Category</Label>
-                                        <Select defaultValue="it">
+                                        <Select
+                                            value={projectDefaults.category}
+                                            onValueChange={(val) => setProjectDefaults({ ...projectDefaults, category: val })}
+                                        >
                                             <SelectTrigger>
                                                 <SelectValue />
                                             </SelectTrigger>
@@ -192,7 +206,10 @@ export default function SettingsPage() {
                                     </div>
                                     <div className="grid gap-2">
                                         <Label>Currency</Label>
-                                        <Select defaultValue="usd">
+                                        <Select
+                                            value={projectDefaults.currency}
+                                            onValueChange={(val) => setProjectDefaults({ ...projectDefaults, currency: val })}
+                                        >
                                             <SelectTrigger>
                                                 <SelectValue />
                                             </SelectTrigger>
@@ -205,9 +222,16 @@ export default function SettingsPage() {
                                     </div>
                                     <div className="grid gap-2">
                                         <Label>Default Contingency Buffer (%)</Label>
-                                        <Input type="number" defaultValue="10" />
+                                        <Input
+                                            type="number"
+                                            value={projectDefaults.buffer}
+                                            onChange={(e) => setProjectDefaults({ ...projectDefaults, buffer: e.target.value })}
+                                        />
                                     </div>
                                 </CardContent>
+                                <CardFooter>
+                                    <Button onClick={handleSaveDefaults}>Save Changes</Button>
+                                </CardFooter>
                             </Card>
                         </div>
                     )}
