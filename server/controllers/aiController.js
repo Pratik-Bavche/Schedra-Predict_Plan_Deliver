@@ -101,8 +101,9 @@ export const getAIAnalytics = async (req, res) => {
                 You are a Portfolio Manager. Analyze these projects: ${summary.substring(0, 1000)}...
                 Total Portfolio Budget: $${totalBudget}.
                 
-                Generate an aggregated 'Actual vs Predicted' cost analysis for the last 6 months for the entire portfolio.
-                Assume 'Actual' varies slightly from 'Predicted'.
+                Generate a CUMULATIVE S-Curve cost analysis for the last 6 months.
+                The 'Predicted' line must show cumulative spending increasing over time (not flat), representing project progress (e.g., Month 1: 10%, Month 6: 100% of pro-rated budget).
+                'Actual' spend should vary realistically around this curve (+/- 5-10%).
                 
                 Return ONLY valid JSON in this format:
                 {
@@ -350,8 +351,10 @@ const generateFallbackData = (type, projectData) => {
             const curve = 1 + (Math.sin(i * 0.5) * 0.2); // Seasonal curve
             const noise = (pseudoRandom(i) * 0.3) - 0.15; // Random noise
 
-            const predictedVal = monthlyBase;
-            const actualVal = monthlyBase * (curve + noise);
+            // Cumulative S-Curve Logic (Predicted = Ideal Growth, Actual = Real with variance)
+            const predictedVal = monthlyBase * i;
+            const variance = 1 + (pseudoRandom(i) * 0.2 - 0.1); // +/- 10% noise
+            const actualVal = predictedVal * variance;
 
             data.push({
                 name: `Month ${i}`,
