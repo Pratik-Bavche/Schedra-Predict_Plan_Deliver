@@ -1,3 +1,5 @@
+import asyncHandler from "express-async-handler";
+
 // @desc    Run generic prediction model
 // @route   POST /api/predict
 // @access  Public
