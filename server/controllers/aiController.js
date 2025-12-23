@@ -3,6 +3,41 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// Optional Anthropic / Claude HTTP support (Enable with ENABLE_CLAUDE=true and provide CLAUDE_API_KEY)
+const useClaude = process.env.ENABLE_CLAUDE === 'true' && !!process.env.CLAUDE_API_KEY;
+
+const callClaude = async (prompt) => {
+    const url = process.env.CLAUDE_API_URL || 'https://api.anthropic.com/v1/complete';
+    const model = process.env.CLAUDE_MODEL || 'claude-haiku-4.5';
+    const apiKey = process.env.CLAUDE_API_KEY;
+
+    const body = {
+        model,
+        prompt,
+        // conservative default - can be overridden via env
+        max_tokens: Number(process.env.CLAUDE_MAX_TOKENS || 2000)
+    };
+
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+    };
+
+    try {
+        const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        const json = await resp.json();
+
+        // Heuristic extraction for common Anthropic response shapes
+        if (json.completion) return json.completion;
+        if (json.output) return typeof json.output === 'string' ? json.output : JSON.stringify(json.output);
+        if (json.text) return json.text;
+        // Fallback: return full JSON string
+        return JSON.stringify(json);
+    } catch (err) {
+        throw new Error(`Claude request failed: ${err.message}`);
+    }
+};
+
 // Parse multiple API keys from .env
 const getKeys = () => (process.env.GEMINI_API_KEY || "").split(',').map(k => k.trim()).filter(Boolean);
 let currentGlobalKeyIndex = 0;
@@ -174,8 +209,19 @@ export const getAIAnalytics = async (req, res) => {
         }
 
         const generateWithRetry = async (retries = 2, delay = 1000) => {
+            // If Claude support is enabled and keys provided, try Claude first
+            if (useClaude) {
+                try {
+                    console.log(`[${timestamp}] ENABLE_CLAUDE=true — attempting Claude model request`);
+                    const claudeText = await callClaude(prompt);
+                    return claudeText;
+                } catch (cErr) {
+                    console.warn(`[${timestamp}] Claude request failed, falling back to Gemini flow:`, cErr.message);
+                }
+            }
+
             const requestedModel = "gemini-2.5-flash";
-            const fallbackModel = "gemini-flash-latest";
+            const fallbackModel = "gemini-1.5-flash";
 
             for (let k = 0; k < apiKeys.length; k++) {
                 const keyIdx = (currentGlobalKeyIndex + k) % apiKeys.length;
@@ -189,14 +235,61 @@ export const getAIAnalytics = async (req, res) => {
                         console.log(`[${timestamp}] Requesting ${requestedModel}...`);
                         const model = localGenAI.getGenerativeModel({ model: requestedModel });
                         const result = await model.generateContent(prompt);
-                        const response = await result.response;
 
-                        currentGlobalKeyIndex = keyIdx;
-                        return response.text();
+                        // Robustly extract textual response from various SDK shapes
+                        try {
+                            // Preferred: result.response is a fetch-style Response
+                            if (result && result.response && typeof result.response.text === 'function') {
+                                const response = await result.response;
+                                const txt = await response.text();
+                                currentGlobalKeyIndex = keyIdx;
+                                return txt;
+                            }
+
+                            // Common SDK surface: result.outputText
+                            if (result && typeof result.outputText === 'string') {
+                                currentGlobalKeyIndex = keyIdx;
+                                return result.outputText;
+                            }
+
+                            // Another common shape: result.output is an array of fragments
+                            if (result && Array.isArray(result.output)) {
+                                const parts = result.output.map(o => {
+                                    if (!o) return '';
+                                    if (typeof o === 'string') return o;
+                                    if (o.content && Array.isArray(o.content)) {
+                                        return o.content.map(c => (c.text || JSON.stringify(c))).join(' ');
+                                    }
+                                    return JSON.stringify(o);
+                                });
+                                const txt = parts.join('\n').trim();
+                                if (txt) {
+                                    currentGlobalKeyIndex = keyIdx;
+                                    return txt;
+                                }
+                            }
+
+                            // Fallback: direct text field or result as string
+                            if (result && typeof result.text === 'string') {
+                                currentGlobalKeyIndex = keyIdx;
+                                return result.text;
+                            }
+                            if (typeof result === 'string') {
+                                currentGlobalKeyIndex = keyIdx;
+                                return result;
+                            }
+
+                            // If nothing matched, throw to trigger retry/fallback
+                            throw new Error('Unrecognized model response shape');
+                        } catch (innerErr) {
+                            console.error(`[${timestamp}] Failed to parse model response for Key #${keyIdx + 1}:`, innerErr);
+                            throw innerErr;
+                        }
                     } catch (error) {
+                        console.error(`[${timestamp}] Key #${keyIdx + 1} error:`, error);
                         const errorMsg = error.message?.toLowerCase() || "";
                         if (errorMsg.includes("429") || errorMsg.includes("quota")) {
-                            console.warn(`[${timestamp}] Key #${keyIdx + 1} quota exceeded for 2.5.`);
+                            console.warn(`[${timestamp}] Key #${keyIdx + 1} quota exceeded.`);
                             break;
                         }
                         if ((errorMsg.includes("503") || errorMsg.includes("overload")) && i < retries - 1) {
@@ -210,7 +303,7 @@ export const getAIAnalytics = async (req, res) => {
                 }
             }
 
-            console.error(`[${timestamp}] ALL KEYS EXHAUSTED for 2.5-flash. Falling back to stable...`);
+            console.error(`[${timestamp}] ALL KEYS EXHAUSTED for gemini-2.5-flash. Falling back to retry with first key...`);
             const stableGenAI = new GoogleGenerativeAI(apiKeys[0]);
             const stableModel = stableGenAI.getGenerativeModel({ model: fallbackModel });
             const result = await stableModel.generateContent(prompt);
@@ -237,7 +330,7 @@ export const getAIAnalytics = async (req, res) => {
                 res.status(500).json({ message: "AI response format was invalid", error: parseError.message });
             }
         } catch (apiError) {
-            console.error(`[${timestamp}] Gemini API Final Failure:`, apiError.message);
+            console.error(`[${timestamp}] Gemini API Final Failure:`, apiError);
             console.warn(`[${timestamp}] Generating STATIC FALLBACK data to keep dashboard alive.`);
 
             const fallbackData = generateFallbackData(type, projectData);

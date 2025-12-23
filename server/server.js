@@ -9,6 +9,7 @@ console.log("\n==================================");
 console.log("!!! SCHEDRA SERVER BOOTED !!!");
 console.log("!!! TIMESTAMP: " + new Date().toISOString() + " !!!");
 console.log("GEMINI_API_KEY:", process.env.GEMINI_API_KEY ? `PRESENT (${process.env.GEMINI_API_KEY.substring(0, 6)}...)` : "!!! MISSING !!!");
+console.log("ENABLE_CLAUDE:", process.env.ENABLE_CLAUDE === 'true' ? `true (CLAUDE_API_KEY ${process.env.CLAUDE_API_KEY ? 'PRESENT' : 'MISSING'})` : 'false');
 console.log("==================================\n");
 
 const app = express();
@@ -71,5 +72,6 @@ export default app;
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`);
+        console.log(`Local link: http://localhost:${PORT}`);
     });
 }

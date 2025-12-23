@@ -1,5 +1,5 @@
 const BASE_URL = import.meta.env.DEV
-    ? "http://localhost:5000/api"
+    ? "http://localhost:5050/api"
     : "https://schedra-predict-plan-deliver-server.vercel.app/api";
 
 
