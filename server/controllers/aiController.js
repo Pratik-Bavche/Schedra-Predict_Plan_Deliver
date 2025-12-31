@@ -220,7 +220,7 @@ export const getAIAnalytics = async (req, res) => {
                 }
             }
 
-            const requestedModel = "gemini-2.5-flash";
+            const requestedModel = "gemini-2.0-flash";
             const fallbackModel = "gemini-1.5-flash";
 
             for (let k = 0; k < apiKeys.length; k++) {
@@ -286,19 +286,24 @@ export const getAIAnalytics = async (req, res) => {
                             throw innerErr;
                         }
                     } catch (error) {
-                        console.error(`[${timestamp}] Key #${keyIdx + 1} error:`, error);
+                        console.error(`[${timestamp}] Key #${keyIdx + 1} error:`, error.message);
                         const errorMsg = error.message?.toLowerCase() || "";
+
                         if (errorMsg.includes("429") || errorMsg.includes("quota")) {
-                            console.warn(`[${timestamp}] Key #${keyIdx + 1} quota exceeded.`);
-                            break;
+                            console.warn(`[${timestamp}] Key #${keyIdx + 1} quota exceeded. Trying next key.`);
+                            break; // Break inner retry loop to go to next key
                         }
+
                         if ((errorMsg.includes("503") || errorMsg.includes("overload")) && i < retries - 1) {
                             console.warn(`[${timestamp}] Overload. Retrying in ${delay}ms...`);
                             await new Promise(r => setTimeout(r, delay));
                             delay *= 2;
-                            continue;
+                            continue; // Retry same key
                         }
-                        throw error;
+
+                        // For other errors (like 400 Bad Request if model invalid, or 404), log and try next key
+                        console.warn(`[${timestamp}] Non-retriable error for this key: ${error.message}. Moving to next key.`);
+                        break;
                     }
                 }
             }
