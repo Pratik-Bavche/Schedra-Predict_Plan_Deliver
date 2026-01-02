@@ -517,14 +517,14 @@ export default function ProjectsPage() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                        <DropdownMenuItem onClick={() => navigate(`/projects/${project._id}`)}>
+                                                        <DropdownMenuItem className="cursor-pointer" onClick={() => navigate(`/projects/${project._id}`)}>
                                                             View Details
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => handleOpenEdit(project)}>
+                                                        <DropdownMenuItem className="cursor-pointer" onClick={() => handleOpenEdit(project)}>
                                                             Edit Details
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
-                                                            className="text-destructive focus:text-destructive"
+                                                            className="text-destructive focus:text-destructive cursor-pointer"
                                                             onClick={() => handleDelete(project)}
                                                         >
                                                             Delete

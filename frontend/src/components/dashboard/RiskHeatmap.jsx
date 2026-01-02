@@ -27,7 +27,7 @@ export function RiskHeatmap({ data = [], loading }) {
                         data.length === 0 ? (
                             <p className="text-sm text-muted-foreground">No regional data available.</p>
                         ) : (
-                            data.map((item, index) => (
+                            data.slice(0, 5).map((item, index) => (
                                 <div key={index} className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0">
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">

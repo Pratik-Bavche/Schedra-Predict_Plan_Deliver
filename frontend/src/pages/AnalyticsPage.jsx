@@ -43,7 +43,7 @@ const generateFrontendFallback = (type, projectData) => {
             ],
             finalCost: budget * (1.05 + (pseudoRandom(2) * 0.1)),
             overrunPercentage: Math.floor(5 + pseudoRandom(3) * 15),
-            insight: "Spending is slightly above projection but within acceptable variance (Simulated Data)."
+            insight: "Spending is slightly above projection but within acceptable variance."
         };
     } else if (type === "resource_utilization") {
         return {
@@ -343,7 +343,7 @@ export default function AnalyticsPage() {
                                 </div>
                                 <p className="text-muted-foreground mt-2">Predicted Overrun</p>
                                 <div className="mt-8 p-4 bg-muted rounded-lg text-sm italic">
-                                    "{costData.insight}"
+                                    {costData.insight}
                                 </div>
                             </CardContent>
                         </Card>

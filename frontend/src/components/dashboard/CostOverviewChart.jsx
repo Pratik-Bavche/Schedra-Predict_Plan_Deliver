@@ -3,16 +3,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2 } from "lucide-react"
 
 const defaultData = [
-    { month: "Jan", actual: 4000, forecast: 4200 },
-    { month: "Feb", actual: 3000, forecast: 3200 },
-    { month: "Mar", actual: 2000, forecast: 2500 },
-    { month: "Apr", actual: 2780, forecast: 2900 },
-    { month: "May", actual: 1890, forecast: 2100 },
-    { month: "Jun", actual: 2390, forecast: 2500 },
+    { name: "Jan", Actual: 4000, Predicted: 4200 },
+    { name: "Feb", Actual: 3000, Predicted: 3200 },
+    { name: "Mar", Actual: 2000, Predicted: 2500 },
+    { name: "Apr", Actual: 2780, Predicted: 2900 },
+    { name: "May", Actual: 1890, Predicted: 2100 },
+    { name: "Jun", Actual: 2390, Predicted: 2500 },
 ]
 
 export function CostOverviewChart({ data, loading }) {
-    const chartData = data || defaultData;
+    const chartData = (data && data.length > 0) ? data : defaultData;
     return (
         <Card className="w-full h-full">
             <CardHeader>

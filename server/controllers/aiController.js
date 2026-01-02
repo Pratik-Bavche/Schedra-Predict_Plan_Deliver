@@ -3,532 +3,227 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Optional Anthropic / Claude HTTP support (Enable with ENABLE_CLAUDE=true and provide CLAUDE_API_KEY)
-const useClaude = process.env.ENABLE_CLAUDE === 'true' && !!process.env.CLAUDE_API_KEY;
+// Optional Claude support
+const useClaude =
+  process.env.ENABLE_CLAUDE === "true" && !!process.env.CLAUDE_API_KEY;
 
-const callClaude = async (prompt) => {
-    const url = process.env.CLAUDE_API_URL || 'https://api.anthropic.com/v1/complete';
-    const model = process.env.CLAUDE_MODEL || 'claude-haiku-4.5';
-    const apiKey = process.env.CLAUDE_API_KEY;
+// Parse Gemini API keys
+const getKeys = () =>
+  (process.env.GEMINI_API_KEY || "")
+    .split(",")
+    .map(k => k.trim())
+    .filter(Boolean);
 
-    const body = {
-        model,
-        prompt,
-        // conservative default - can be overridden via env
-        max_tokens: Number(process.env.CLAUDE_MAX_TOKENS || 2000)
-    };
-
-    const headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-    };
-
-    try {
-        const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
-        const json = await resp.json();
-
-        // Heuristic extraction for common Anthropic response shapes
-        if (json.completion) return json.completion;
-        if (json.output) return typeof json.output === 'string' ? json.output : JSON.stringify(json.output);
-        if (json.text) return json.text;
-        // Fallback: return full JSON string
-        return JSON.stringify(json);
-    } catch (err) {
-        throw new Error(`Claude request failed: ${err.message}`);
-    }
-};
-
-// Parse multiple API keys from .env
-const getKeys = () => (process.env.GEMINI_API_KEY || "").split(',').map(k => k.trim()).filter(Boolean);
 let currentGlobalKeyIndex = 0;
 
 export const getAIAnalytics = async (req, res) => {
-    try {
-        const timestamp = new Date().toLocaleTimeString();
-        const apiKeys = getKeys();
+  const timestamp = new Date().toLocaleTimeString();
+  const apiKeys = getKeys();
 
-        console.log(`[${timestamp}] --- NEW AI REQUEST ---`);
-        console.log(`[${timestamp}] Active Keys available: ${apiKeys.length}`);
+  console.log(`[${timestamp}] --- NEW AI REQUEST ---`);
+  console.log(`[${timestamp}] Active Keys: ${apiKeys.length}`);
 
-        if (apiKeys.length === 0) {
-            console.error(`[${timestamp}] CRITICAL: No API keys found!`);
-            return res.status(500).json({ message: "Server misconfiguration: Missing API Keys" });
-        }
+  if (apiKeys.length === 0) {
+    return res.status(500).json({ message: "Missing GEMINI_API_KEY" });
+  }
 
-        const { type, projectData } = req.body;
-        console.log("Request Type:", type);
+  const { type, projectData } = req.body;
+  let prompt = "";
 
-        let prompt = "";
+  // ---------------- PROMPT BUILDER ----------------
+  // Support both single-project and dashboard-level requests
+  if (type === "cost_forecast" || type === "dashboard_cost_forecast" || type === "project_cost_forecast") {
+    // For dashboard requests, projectData may be an array
+    const pd = (Array.isArray(projectData) ? projectData[0] : projectData) || {};
+    prompt = `
+You are an AI project manager.
+Analyze the project below and return ONLY valid JSON.
 
-        if (type === "cost_forecast") {
-            prompt = `
-                You are an AI project manager. Analyze the following project data and provide a JSON response.
-                
-                Project Context:
-                Name: ${projectData.name}
-                Budget: ${projectData.budget}
-                Start Date: ${projectData.startDate}
-                Description: ${projectData.description}
-                
-                Task: Generate a cost forecast comparing actual spend vs AI-predicted budget for the last 6 months.
-                Also predict final cost and potential overrun percentage.
-                
-                Return ONLY valid JSON in this format:
-                {
-                    "forecastData": [
-                        {"name": "Month 1", "Actual": 1000, "Predicted": 1200},
-                         ... (6 months)
-                    ],
-                    "finalCost": 120000,
-                    "overrunPercentage": 15,
-                    "insight": "Brief one sentence insight."
-                }
-            `;
-        } else if (type === "resource_utilization") {
-            prompt = `
-                You are an AI resource planner. Analyze the project: ${projectData.name}.
-                Generate a heatmap of team activity and utilization stats.
-                
-                Return ONLY valid JSON in this format:
-                {
-                    "utilizationScore": 85,
-                    "heatmap": [
-                        {"name": "Dev Team", "data": [{"x": "Mon", "y": 80}, {"x": "Tue", "y": 90} ... (5 days)]}
-                    ],
-                    "pendingApprovals": 3,
-                    "insight": "Brief one sentence insight."
-                }
-            `;
-        } else if (type === "risk_assessment") {
-            prompt = `
-                 You are an AI Risk Analyst. Analyze: ${projectData.name}.
-                 
-                 Return ONLY valid JSON in this format:
-                 {
-                    "riskScore": 78,
-                    "confidenceLevel": "High",
-                    "hotspots": [
-                        "Supply Chain Delay"
-                    ],
-                    "insight": "Brief one sentence mitigation strategy."
-                 }
-            `;
-        } else if (type === "timeline_prediction") {
-            prompt = `
-                You are an AI Scheduler. Analyze: ${projectData.name}.
-                
-                Return ONLY valid JSON in this format:
-                {
-                    "predictedCompletion": "2025-12-25",
-                    "delayProbability": "Medium",
-                    "phases": [
-                        {"name": "Implementation", "status": "Delayed"}
-                    ],
-                    "insight": "Reason for potential delay."
-                }
-            `;
-        } else if (type === "dashboard_cost_forecast") {
-            const projects = req.body.projects || [];
-            const summary = projects.map(p => `${p.name} ($${p.budget})`).join(", ");
-            const totalBudget = projects.reduce((acc, p) => acc + (Number(p.budget) || 0), 0);
+Project:
+Name: ${pd.name}
+Budget: ${pd.budget}
+Start Date: ${pd.startDate}
+Description: ${pd.description || "N/A"}
 
-            prompt = `
-                You are a Portfolio Manager. Analyze these projects: ${summary.substring(0, 1000)}...
-                Total Portfolio Budget: $${totalBudget}.
-                
-                Generate a CUMULATIVE S-Curve cost analysis for the last 6 months.
-                The 'Predicted' line must show cumulative spending increasing over time (not flat), representing project progress (e.g., Month 1: 10%, Month 6: 100% of pro-rated budget).
-                'Actual' spend should vary realistically around this curve (+/- 5-10%).
-                
-                Return ONLY valid JSON in this format:
-                {
-                    "forecastData": [
-                         {"name": "Month 1", "Actual": 45000, "Predicted": 50000},
-                         {"name": "Month 2", "Actual": 52000, "Predicted": 50000},
-                         ... (6 months)
-                    ],
-                    "insight": "Brief aggregated financial insight."
-                }
-            `;
-        } else if (type === "dashboard_risk_assessment") {
-            const projects = req.body.projects || [];
-            const summary = projects.map(p => `${p.region || p.type || "General"}: ${p.name} (${p.riskLevel})`).join(", ");
+JSON format:
+{
+  "forecastData": [
+    { "name": "Month 1", "Actual": 1000, "Predicted": 1200 }
+  ],
+  "finalCost": 120000,
+  "overrunPercentage": 10,
+  "insight": "One sentence insight"
+}
+`;
+  } else if (type === "dashboard_risk_assessment" || type === "project_risk_assessment") {
+    // Expect an array of projects or single project
+    const projects = (Array.isArray(projectData) ? projectData : [projectData]).filter(p => p);
 
-            prompt = `
-                You are a Risk Analyst. Analyze these projects grouped by Region/Category: ${summary.substring(0, 1000)}...
-                
-                Identify the primary risk factor for each region (e.g., "Resource Shortage", "Timeline Compression", "Budget Constraints").
-                Calculate an aggregate risk score (0-100) for each region.
-                
-                Return ONLY valid JSON in this format:
-                {
-                    "riskData": [
-                         {"region": "North America", "factor": "Resource Shortage", "score": 75},
-                         {"region": "Europe", "factor": "Regulatory Compliance", "score": 40}
-                    ]
-                }
-            `;
-        } else if (type === "project_cost_forecast") {
-            prompt = `
-                You are a Construction Project Manager. Analyze this project:
-                Name: ${projectData.name}
-                Budget: $${projectData.budget}
-                Start Date: ${projectData.startDate}
-                
-                Generate a 6-month 'Actual vs Predicted' cumulative cost forecast based on the budget curve.
-                
-                Return ONLY valid JSON in this format:
-                {
-                    "forecastData": [
-                         {"name": "Jan", "Actual": 20000, "Predicted": 22000},
-                         ... (6 months)
-                    ],
-                    "insight": "Brief financial health check."
-                }
-            `;
-        } else if (type === "project_risk_assessment") {
-            prompt = `
-                You are a Risk Manager. Analyze risks for this project: ${projectData.name} (Risk Level: ${projectData.riskLevel}).
-                Categories: Technical, Financial, Schedule, Environmental, Operational.
-                
-                Assign a risk score (0-100) and primary factor for 3-4 relevant categories.
-                
-                Return ONLY valid JSON in this format:
-                {
-                    "riskData": [
-                         {"region": "Technical", "factor": "Integration", "score": 65},
-                         {"region": "Financial", "factor": "Cost Overrun", "score": 40}
-                    ]
-                }
-            `;
-        }
+    // If it's a single project risk assessment (Project Details Page), we want a detailed breakdown
+    const isSingleProject = type === "project_risk_assessment";
 
+    const projectList = projects
+      .map((p) => `- Name: ${p.name || "Unnamed"}, Region: ${p.region || p.type || "General"}, Risk: ${p.riskLevel || "Low"}`)
+      .join("\n");
 
-        if (!prompt) {
-            return res.status(400).json({ message: "Invalid prediction type" });
-        }
+    prompt = `
+You are an AI risk analyst. 
+${isSingleProject
+        ? "Analyze this specific project and identify potential risk zones (Regional/Operational areas). Break down the risk by 4-5 hypothetical or actual regions/zones."
+        : "Given the following list of projects, aggregate risk by region."}
+Return ONLY valid JSON.
 
-        const generateWithRetry = async (retries = 2, delay = 1000) => {
-            // If Claude support is enabled and keys provided, try Claude first
-            if (useClaude) {
-                try {
-                    console.log(`[${timestamp}] ENABLE_CLAUDE=true — attempting Claude model request`);
-                    const claudeText = await callClaude(prompt);
-                    return claudeText;
-                } catch (cErr) {
-                    console.warn(`[${timestamp}] Claude request failed, falling back to Gemini flow:`, cErr.message);
-                }
-            }
+Projects:
+${projectList}
 
-            const requestedModel = "gemini-2.0-flash";
-            const fallbackModel = "gemini-2.0-flash";
+JSON format:
+{
+  "riskData": [
+    { "region": "Region/Zone Name", "factor": "Risk Factor Name", "score": 85 }
+  ]
+}
+`;
+  } else {
+    console.warn(`[${timestamp}] Invalid prediction type received: ${type}`);
+    return res.status(400).json({ message: "Invalid prediction type" });
+  }
 
-            for (let k = 0; k < apiKeys.length; k++) {
-                const keyIdx = (currentGlobalKeyIndex + k) % apiKeys.length;
-                const currentKey = apiKeys[keyIdx];
+  // ---------------- GEMINI CALL ----------------
+  const generateWithRetry = async () => {
+    // Priority list of models as requested
+    // Note: 2.5 models are hypothetical or preview-only; adding 2.0 and 1.5 as safe production fallbacks.
+    const MODELS = [
+      "gemini-2.5-flash-lite",
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash"
+    ];
 
-                console.log(`[${timestamp}] Trying Key #${keyIdx + 1} (${currentKey.substring(0, 8)}...)`);
-                const localGenAI = new GoogleGenerativeAI(currentKey);
+    let lastError = null;
 
-                for (let i = 0; i < retries; i++) {
-                    try {
-                        console.log(`[${timestamp}] Requesting ${requestedModel}...`);
-                        const model = localGenAI.getGenerativeModel({ model: requestedModel });
-                        const result = await model.generateContent(prompt);
+    for (const modelName of MODELS) {
+      console.log(`[${timestamp}] Trying model: ${modelName}`);
 
-                        // Robustly extract textual response from various SDK shapes
-                        try {
-                            // Preferred: result.response.text() is the standard Google Generative AI SDK method
-                            if (result && result.response && typeof result.response.text === 'function') {
-                                const txt = result.response.text();
-                                currentGlobalKeyIndex = keyIdx;
-                                return txt;
-                            }
-
-                            // Common SDK surface: result.outputText
-                            if (result && typeof result.outputText === 'string') {
-                                currentGlobalKeyIndex = keyIdx;
-                                return result.outputText;
-                            }
-
-                            // Another common shape: result.output is an array of fragments
-                            if (result && Array.isArray(result.output)) {
-                                const parts = result.output.map(o => {
-                                    if (!o) return '';
-                                    if (typeof o === 'string') return o;
-                                    if (o.content && Array.isArray(o.content)) {
-                                        return o.content.map(c => (c.text || JSON.stringify(c))).join(' ');
-                                    }
-                                    return JSON.stringify(o);
-                                });
-                                const txt = parts.join('\n').trim();
-                                if (txt) {
-                                    currentGlobalKeyIndex = keyIdx;
-                                    return txt;
-                                }
-                            }
-
-                            // Fallback: direct text field or result as string
-                            if (result && typeof result.text === 'string') {
-                                currentGlobalKeyIndex = keyIdx;
-                                return result.text;
-                            }
-                            if (typeof result === 'string') {
-                                currentGlobalKeyIndex = keyIdx;
-                                return result;
-                            }
-
-                            // If nothing matched, throw to trigger retry/fallback
-                            throw new Error('Unrecognized model response shape');
-                        } catch (innerErr) {
-                            console.error(`[${timestamp}] Failed to parse model response for Key #${keyIdx + 1}:`, innerErr);
-                            throw innerErr;
-                        }
-                    } catch (error) {
-                        console.error(`[${timestamp}] Key #${keyIdx + 1} error:`, error.message);
-                        const errorMsg = error.message?.toLowerCase() || "";
-
-                        if (errorMsg.includes("429") || errorMsg.includes("quota")) {
-                            console.warn(`[${timestamp}] Key #${keyIdx + 1} quota exceeded. Trying next key.`);
-                            break; // Break inner retry loop to go to next key
-                        }
-
-                        if ((errorMsg.includes("503") || errorMsg.includes("overload")) && i < retries - 1) {
-                            console.warn(`[${timestamp}] Overload. Retrying in ${delay}ms...`);
-                            await new Promise(r => setTimeout(r, delay));
-                            delay *= 2;
-                            continue; // Retry same key
-                        }
-
-                        // For other errors (like 400 Bad Request if model invalid, or 404), log and try next key
-                        console.warn(`[${timestamp}] Non-retriable error for this key: ${error.message}. Moving to next key.`);
-                        break;
-                    }
-                }
-            }
-
-            console.error(`[${timestamp}] ALL KEYS EXHAUSTED for gemini-2.5-flash. Falling back to retry with first key...`);
-            const stableGenAI = new GoogleGenerativeAI(apiKeys[0]);
-            const stableModel = stableGenAI.getGenerativeModel({ model: fallbackModel });
-            const result = await stableModel.generateContent(prompt);
-            const response = result.response;
-            return response.text();
-        };
+      for (let k = 0; k < apiKeys.length; k++) {
+        const keyIdx = (currentGlobalKeyIndex + k) % apiKeys.length;
+        const genAI = new GoogleGenerativeAI(apiKeys[keyIdx]);
 
         try {
-            const text = await generateWithRetry();
-            console.log(`[${timestamp}] Gemini Response Text (First 100 chars):`, text.substring(0, 100));
+          // Rate-limit protection
+          await new Promise(r => setTimeout(r, 800)); // Slightly reduced wait for efficiency
 
-            let jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-            const firstBrace = jsonStr.indexOf('{');
-            const lastBrace = jsonStr.lastIndexOf('}');
-            if (firstBrace !== -1 && lastBrace !== -1) {
-                jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
-            }
+          console.log(`[${timestamp}] Requesting ${modelName} with key index ${keyIdx}...`);
 
-            try {
-                const data = JSON.parse(jsonStr);
-                res.json(data);
-            } catch (parseError) {
-                console.error(`[${timestamp}] JSON Parse Error. Full response text:`, text);
-                res.status(500).json({ message: "AI response format was invalid", error: parseError.message });
-            }
-        } catch (apiError) {
-            console.error(`[${timestamp}] Gemini API Final Failure:`, apiError);
-            console.warn(`[${timestamp}] Generating STATIC FALLBACK data to keep dashboard alive.`);
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await model.generateContent(prompt);
 
-            const fallbackData = generateFallbackData(type, projectData);
-            res.json(fallbackData);
+          const text = result.response.text();
+          currentGlobalKeyIndex = keyIdx; // Update global index on success
+          return { text, modelName };
+        } catch (err) {
+          lastError = err;
+          const msg = err.message?.toLowerCase() || "";
+          console.error(`[${timestamp}] Error with ${modelName} (key ${keyIdx}):`, err.message);
+
+          // If it's a model not found error, break key loop and try next model immediately
+          if (msg.includes("not found") || msg.includes("404")) {
+            console.warn(`[${timestamp}] Model ${modelName} not found. Switching to next model.`);
+            break; // Break key loop, go to next model
+          }
+
+          // If quota/rate limit, try next key (continue loop)
+          if (msg.includes("429") || msg.includes("quota") || msg.includes("403")) {
+            console.warn(`[${timestamp}] Quota exceeded for key ${keyIdx}. Trying next key.`);
+            continue;
+          }
+
+          // Other errors, continue to next key/model attempt
         }
-    } catch (error) {
-        console.error("Critical AI Controller Error:", error);
-        // Even in critical error, try to return fallback if type and projectData exist
-        if (req.body.type && req.body.projectData) {
-            const fallbackData = generateFallbackData(req.body.type, req.body.projectData);
-            return res.json(fallbackData);
-        }
-        res.status(500).json({ message: "Critical internal error", error: error.message });
+      }
     }
+
+    throw new Error(`All Gemini models and keys exhausted. Last error: ${lastError?.message}`);
+  };
+
+  // ---------------- RESPONSE HANDLING ----------------
+  try {
+    const { text, modelName } = await generateWithRetry();
+    console.log(`[${timestamp}] Gemini success using ${modelName}`);
+
+    let jsonStr = text.replace(/```json|```/g, "").trim();
+    // Improved JSON extraction in case of preamble/postamble
+    const firstBrace = jsonStr.indexOf("{");
+    const lastBrace = jsonStr.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+    }
+
+    const data = JSON.parse(jsonStr);
+    data.__aiSource = "gemini";
+    data.__aiModel = modelName;
+    return res.json(data);
+  } catch (err) {
+    console.warn(`[${timestamp}] AI Generation failed: ${err.message}. Using FALLBACK data.`);
+    const fallback = generateFallbackData(type, projectData);
+    fallback.__aiSource = "fallback";
+    return res.json(fallback);
+  }
 };
 
+// ---------------- FALLBACK ----------------
 const generateFallbackData = (type, projectData) => {
-    // Generate seeded randomness based on project name for consistency
-    let seed = 0;
-    const pName = (projectData && projectData.name) ? projectData.name : "Default";
-    for (let i = 0; i < pName.length; i++) {
-        seed += pName.charCodeAt(i);
-    }
-    const pseudoRandom = (offset) => {
-        const x = Math.sin(seed + offset) * 10000;
-        return x - Math.floor(x);
+  if (type === "cost_forecast" || type === "dashboard_cost_forecast" || type === "project_cost_forecast") {
+    const pd = Array.isArray(projectData) ? projectData[0] : projectData;
+    const budget = Number(pd?.budget) || 50000;
+
+    return {
+      forecastData: [
+        { name: "Month 1", Actual: budget * 0.1, Predicted: budget * 0.12 },
+        { name: "Month 2", Actual: budget * 0.25, Predicted: budget * 0.24 },
+        { name: "Month 3", Actual: budget * 0.4, Predicted: budget * 0.36 },
+        { name: "Month 4", Actual: budget * 0.55, Predicted: budget * 0.48 },
+        { name: "Month 5", Actual: budget * 0.7, Predicted: budget * 0.6 },
+        { name: "Month 6", Actual: budget * 0.85, Predicted: budget * 0.72 }
+      ],
+      finalCost: budget * 1.08,
+      overrunPercentage: 8,
+      insight:
+        "Spending is slightly above projection but within acceptable variance."
     };
+  }
 
-    const budget = (projectData && projectData.budget) ? parseFloat(projectData.budget) : 10000;
+  if (type === "dashboard_risk_assessment" || type === "project_risk_assessment") {
+    const projects = (Array.isArray(projectData) ? projectData : [projectData]).filter(p => p);
+    const regionMap = {};
 
-    if (type === "cost_forecast") {
-        const variance = 1 + (pseudoRandom(1) * 0.4 - 0.2);
-        return {
-            forecastData: [
-                { name: "Month 1", Actual: budget * 0.1, Predicted: budget * 0.12 * variance },
-                { name: "Month 2", Actual: budget * 0.25, Predicted: budget * 0.24 * variance },
-                { name: "Month 3", Actual: budget * 0.4, Predicted: budget * 0.36 * variance },
-                { name: "Month 4", Actual: budget * 0.55, Predicted: budget * 0.48 * variance },
-                { name: "Month 5", Actual: budget * 0.7, Predicted: budget * 0.60 * variance },
-                { name: "Month 6", Actual: budget * 0.85, Predicted: budget * 0.72 * variance }
-            ],
-            finalCost: budget * (1.05 + pseudoRandom(2) * 0.1),
-            overrunPercentage: Math.floor(5 + pseudoRandom(3) * 15),
-            insight: "Spending is slightly above projection but within acceptable variance (Backend Fallback)."
-        };
-    } else if (type === "resource_utilization") {
-        return {
-            utilizationScore: Math.floor(70 + pseudoRandom(4) * 25),
-            heatmap: [
-                { name: "Dev Team", data: Array.from({ length: 5 }, (_, i) => ({ x: ["Mon", "Tue", "Wed", "Thu", "Fri"][i], y: Math.floor(60 + pseudoRandom(i + 5) * 40) })) },
-                { name: "QA Team", data: Array.from({ length: 5 }, (_, i) => ({ x: ["Mon", "Tue", "Wed", "Thu", "Fri"][i], y: Math.floor(50 + pseudoRandom(i + 10) * 40) })) },
-                { name: "Design", data: Array.from({ length: 5 }, (_, i) => ({ x: ["Mon", "Tue", "Wed", "Thu", "Fri"][i], y: Math.floor(40 + pseudoRandom(i + 15) * 50) })) }
-            ],
-            pendingApprovals: Math.floor(pseudoRandom(20) * 5),
-            insight: "Resource utilization is optimal across key teams (Backend Fallback)."
-        };
-    } else if (type === "risk_assessment") {
-        const score = Math.floor(pseudoRandom(25) * 100);
-        return {
-            riskScore: score,
-            confidenceLevel: score > 75 ? "High" : (score > 40 ? "Medium" : "Low"),
-            hotspots: score > 50 ? ["Budget Constraint", "Tight Deadline"] : ["Minor Schedule Slip"],
-            insight: score > 50 ? "High risk detected (Backend Fallback)." : "Project risk is well managed (Backend Fallback)."
-        };
-    } else if (type === "timeline_prediction") {
-        const delayChance = pseudoRandom(30);
-        return {
-            predictedCompletion: projectData.dueDate || "2025-12-31",
-            delayProbability: delayChance > 0.7 ? "High" : (delayChance > 0.3 ? "Medium" : "Low"),
-            phases: [
-                { name: "Planning", status: "Done" },
-                { name: "Execution", status: delayChance > 0.5 ? "Delayed" : "On Track" },
-                { name: "Testing", status: "Pending" }
-            ],
-            insight: "Timeline analysis completed (Backend Fallback)."
-        };
-    } else if (type === "dashboard_cost_forecast") {
-        const data = [];
-        let projects = [];
-        if (projectData && Array.isArray(projectData.projects)) {
-            projects = projectData.projects;
-        } else if (Array.isArray(projectData)) {
-            projects = projectData;
-        }
-
-        let totalBudget = 0;
-        if (projects.length > 0) {
-            totalBudget = projects.reduce((acc, p) => acc + (Number(p.budget) || 0), 0);
-        } else {
-            totalBudget = 300000; // Mock 300k if no data
-        }
-
-        const monthlyBase = totalBudget / 6;
-
-        // Create a stable seed from project names to ensure consistent fallback data across refreshes
-        let seed = 0;
-        projects.forEach(p => {
-            const name = p.name || "";
-            for (let j = 0; j < name.length; j++) {
-                seed += name.charCodeAt(j);
-            }
-        });
-
-        const pseudoRandom = (offset) => {
-            const x = Math.sin(seed + offset) * 10000;
-            return x - Math.floor(x);
-        };
-
-        for (let i = 1; i <= 6; i++) {
-            // Use seeded random for variance so it looks dynamic but stays constant on refresh
-            const curve = 1 + (Math.sin(i * 0.5) * 0.2); // Seasonal curve
-            const noise = (pseudoRandom(i) * 0.3) - 0.15; // Random noise
-
-            // Cumulative S-Curve Logic (Predicted = Ideal Growth, Actual = Real with variance)
-            const predictedVal = monthlyBase * i;
-            const variance = 1 + (pseudoRandom(i) * 0.2 - 0.1); // +/- 10% noise
-            const actualVal = predictedVal * variance;
-
-            data.push({
-                name: `Month ${i}`,
-                Actual: Math.round(actualVal),
-                Predicted: Math.round(predictedVal)
-            });
-        }
-        return {
-            forecastData: data,
-            insight: "Portfolio spending is projected based on current budgets (Backend Fallback)."
-        };
-    } else if (type === "dashboard_risk_assessment") {
-        const projects = (projectData && Array.isArray(projectData.projects)) ? projectData.projects : (Array.isArray(projectData) ? projectData : []);
-        const regionMap = {};
-
-        projects.forEach(p => {
-            const region = p.region || p.type || "General";
-            if (!regionMap[region]) regionMap[region] = { count: 0, scoreSum: 0 };
-
-            let score = 20; // Low
-            if (p.riskLevel === 'Medium') score = 55;
-            if (p.riskLevel === 'High') score = 85;
-            if (p.riskLevel === 'Critical') score = 95;
-
-            regionMap[region].count++;
-            regionMap[region].scoreSum += score;
-        });
-
-        const riskData = Object.keys(regionMap).map(r => {
-            const avg = Math.round(regionMap[r].scoreSum / regionMap[r].count);
-            const factor = avg > 70 ? "Timeline Criticality" : (avg > 40 ? "Resource Allocation" : "Operational Efficiency");
-            return { region: r, factor, score: avg };
-        });
-
-        if (riskData.length === 0) {
-            return {
-                riskData: [
-                    { region: "General", factor: "System Stability", score: 25 }
-                ]
-            };
-        }
-
-        return { riskData };
-    } else if (type === "project_cost_forecast") {
-        const budget = Number(projectData.budget) || 50000;
-        const monthly = budget / 6; // Spread over 6 months view
-        const data = [];
-
-        for (let i = 1; i <= 6; i++) {
-            // Use project-specific seed for unique chart shapes per project
-            const uniqueCurve = 1 + (pseudoRandom(i + 10) * 0.3 - 0.15);
-
-            const predictedVal = monthly * i;
-            const actualVal = predictedVal * uniqueCurve;
-
-            data.push({
-                name: `Month ${i}`,
-                Actual: Math.round(actualVal),
-                Predicted: Math.round(predictedVal)
-            });
-        }
-
-        return {
-            forecastData: data,
-            insight: "Project spending is tracking against the baseline curve (Backend Fallback)."
-        };
-    } else if (type === "project_risk_assessment") {
-        const baseScore = projectData.riskLevel === 'High' ? 80 : (projectData.riskLevel === 'Medium' ? 50 : 20);
-
-        const riskData = [
-            { region: "Technical", factor: "Complexity", score: baseScore + Math.floor(Math.random() * 10) },
-            { region: "Financial", factor: "Budget", score: baseScore - 5 },
-            { region: "Schedule", factor: "Timeline", score: baseScore + 5 },
-            { region: "Operational", factor: "Resources", score: baseScore }
-        ];
-
-        return { riskData };
+    // Logic for single project fallback (simulated regions)
+    if (projects.length === 1 && type === "project_risk_assessment") {
+      return {
+        riskData: [
+          { region: "North Zone", factor: "Supply Chain", score: 75 },
+          { region: "South Zone", factor: "Labor Availability", score: 45 },
+          { region: "East Zone", factor: "Weather Impact", score: 60 },
+          { region: "West Zone", factor: "Regulatory", score: 30 }
+        ]
+      };
     }
-    return { message: "No data available" };
+
+    projects.forEach(p => {
+      const region = p.region || p.type || "General";
+      if (!regionMap[region]) regionMap[region] = { count: 0, scoreSum: 0 };
+      let score = p.riskLevel === 'Critical' ? 95 : p.riskLevel === 'High' ? 85 : p.riskLevel === 'Medium' ? 55 : 20;
+      regionMap[region].count++;
+      regionMap[region].scoreSum += score;
+    });
+
+    const finalRisk = Object.keys(regionMap).map(r => ({
+      region: r,
+      factor: regionMap[r].scoreSum / regionMap[r].count > 60 ? "Timeline Criticality" : "Operational Efficiency",
+      score: Math.round(regionMap[r].scoreSum / regionMap[r].count)
+    }));
+    return { riskData: finalRisk };
+  }
+
+  // Default fallback for unknown types
+  return {};
 };

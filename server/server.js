@@ -62,9 +62,20 @@ app.use((err, req, res, next) => {
 export default app;
 
 // Only listen if run directly (not imported as a module by Vercel)
+// Only listen if run directly
 if (process.env.NODE_ENV !== 'production') {
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`);
         console.log(`Local link: http://localhost:${PORT}`);
+    });
+
+    server.on('error', (e) => {
+        if (e.code === 'EADDRINUSE') {
+            console.error(`\n\x1b[31mError: Port ${PORT} is already in use.\x1b[0m`);
+            console.error(`\x1b[33mPossible fix:\x1b[0m Stop the other terminal/process running the server, or wait a few seconds.`);
+            process.exit(1);
+        } else {
+            console.error(e);
+        }
     });
 }
